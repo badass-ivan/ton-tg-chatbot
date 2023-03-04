@@ -153,9 +153,7 @@ ss
                 return this.addressOtp[address.toString()] === +otp;
             });
 
-            // if (hasTxn) {
-            if (true) {
-
+            if (hasTxn) {
                 try {
                     console.log(`Start saving user ${tgUserId} with address ${sessionData.address}`);
                     await ChatMembersService.saveChatMember({ tgUserId, address: sessionData.address, })
