@@ -48,7 +48,9 @@ export class BotService {
 
     private static bindOnText() {
         this.bot.on('message', async (ctx) => {
-            if (ctx.message.new_chat_member) {
+            const msg = ctx.message;
+
+            if (msg && msg.chat.id === config.CHAT_ID && msg.new_chat_member) {
                 await this.onNewChatMember(ctx, ctx.message.new_chat_member);
                 return;
             }
