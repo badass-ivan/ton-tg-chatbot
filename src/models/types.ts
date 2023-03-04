@@ -23,6 +23,15 @@ export type Nft = {
     verified: true
 }
 
+export type Txn = {
+    in_msg: {
+        msg_data: string,
+        destination: {
+            address: string,
+        }
+    }
+}
+
 export enum Rarity {
     Common = "Common",
     Uncommon = "Uncommon",

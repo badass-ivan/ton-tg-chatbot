@@ -1,5 +1,6 @@
 import { ChatMember, RawChatMember } from "../models/types";
 import { Column, Model, PrimaryKey, Table } from "sequelize-typescript";
+import { uuid } from "uuidv4";
 
 @Table({
     tableName: "chat_members",
@@ -23,10 +24,12 @@ export class ChatMembers extends Model {
         return this.findAll()
     }
 
-    static async saveChatMember({ address, tgUserId }: RawChatMember): Promise<ChatMember> {
+    static async saveChatMember(member: RawChatMember): Promise<ChatMember> {
+        const address = member.address;
+        const tgUserId = member.tgUserId.toString();
         return (await ChatMembers.findOrCreate({
             where: { tgUserId },
-            defaults: { address, tgUserId }
+            defaults: { id: uuid(), address, tgUserId }
         }))[0]
     }
 }

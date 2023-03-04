@@ -1,5 +1,6 @@
 import axios from "axios";
 import config, { TON_REQ_HEADER } from "../config";
+import { Txn } from "../models/types";
 
 export class TonService {
 
@@ -15,15 +16,12 @@ export class TonService {
 
             return data.nft_items;
         } catch (e) {
-            if (e.response.data.includes("illegal base64 data at input byte ")) {
-                throw Error("Дружище, это не похоже на адрес...")
-            }
-
-            throw Error(e.response.data.error || e.response.data.message || e.response.data)
+            const errorData = e.response.data;
+            throw Error(errorData.error || errorData.message || errorData)
         }
     }
 
-    static async getTxns(address: string) {
+    static async getTxns(address: string): Promise<Txn[]> {
         try {
             const { data } = await axios.get(`${config.TON_API_URL}/blockchain/getTransactions?`+ new URLSearchParams({
                 account: address,
@@ -32,11 +30,6 @@ export class TonService {
             return data.transactions;
         } catch (e) {
             const errorData = e.response.data;
-
-            if (typeof errorData === "string" && errorData.includes("illegal base64 data at input byte ")) {
-                throw Error("Дружище, это не похоже на адрес...")
-            }
-
             throw Error(errorData.error || errorData.message || errorData)
         }
     }

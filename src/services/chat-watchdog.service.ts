@@ -2,6 +2,7 @@ import { Telegraf } from "telegraf-ts";
 import config from "../config";
 import { TonService } from "./ton.service";
 import { ChatMembersService } from "./chat-members.service";
+import chatMessagesConfig from "../chat-messages.config";
 
 export class ChatWatchdogService {
 
@@ -32,7 +33,7 @@ export class ChatWatchdogService {
                 const member = await this.bot.telegram.getChatMember(config.CHAT_ID, +it.tgUserId);
                 console.log(`Remove ${member.user.username} from chat`)
                 await this.bot.telegram.kickChatMember(config.CHAT_ID, +it.tgUserId);
-                await this.bot.telegram.sendMessage(config.CHAT_ID, `${member.user.username} изгнан😈! Отсутствие обезьяны карается!`);
+                await this.bot.telegram.sendMessage(config.CHAT_ID, chatMessagesConfig.watchdog.ban.replace("$USER$", member.user.username));
             }
         }))
     }
