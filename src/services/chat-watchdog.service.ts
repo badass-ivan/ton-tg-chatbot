@@ -3,14 +3,11 @@ import config from "../config";
 import { TonService } from "./ton.service";
 import { ChatMembersService } from "./chat-members.service";
 import chatMessagesConfig from "../chat-messages.config";
+import { BotService } from "./bot.service";
 
 export class ChatWatchdogService {
 
-    private static bot: Telegraf<any>;
-
-    static start(bot: Telegraf<any>) {
-        this.bot = bot;
-
+    static start() {
         this.startCheckingChatUsers();
     }
 
@@ -30,10 +27,10 @@ export class ChatWatchdogService {
             const nfts = await TonService.getNftsFromTargetCollection(it.address);
 
             if (!nfts.length) {
-                const member = await this.bot.telegram.getChatMember(config.CHAT_ID, +it.tgUserId);
+                const member = await BotService.getChatMember(+it.tgUserId);
                 console.log(`Remove ${member.user.username} from chat`)
-                await this.bot.telegram.kickChatMember(config.CHAT_ID, +it.tgUserId);
-                await this.bot.telegram.sendMessage(config.CHAT_ID, chatMessagesConfig.watchdog.ban.replace("$USER$", member.user.username));
+                await BotService.kickChatMember(+it.tgUserId);
+                await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", member.user.username));
             }
         }))
     }

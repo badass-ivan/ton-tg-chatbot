@@ -1,7 +1,7 @@
 import { Telegraf } from "telegraf-ts";
 import config from "../config";
 import { TonService } from "./ton.service";
-import { colorByRarity, Nft, rarityPosition, Txn } from "../models/types";
+import { colorByRarity, NewChatMember, Nft, rarityPosition, Txn } from "../models/types";
 import moment from "moment";
 import base64 from "base-64";
 import { Address } from 'ton';
@@ -18,7 +18,7 @@ export class BotService {
 
     private static addressOtp: { [address: string]: number } = {};
 
-    private static userAddress: { [tgUserId: string]: string } = {};
+    private static userSessionData: { [tgUserId: string]: { address: string, nfts: Nft[] } | null } = {};
 
     static async start() {
         console.log("Start bot preparing");
@@ -26,7 +26,7 @@ export class BotService {
         this.bot = new Telegraf(config.BOT_TOKEN);
 
         await ChatMembersService.init();
-        await ChatWatchdogService.start(this.bot);
+        await ChatWatchdogService.start();
 
         this.bindOnStart();
         this.bindOnText();
@@ -39,7 +39,7 @@ export class BotService {
 
     private static bindOnStart() {
         this.bot.start(async (ctx) => {
-            if (await this.checkMsgFromBot(ctx)) {
+            if (await this.checkIsUnwatchedMsg(ctx)) {
                 return;
             }
             ctx.reply(chatMessagesConfig.sign.start);
@@ -47,8 +47,13 @@ export class BotService {
     }
 
     private static bindOnText() {
-        this.bot.on('text', async (ctx) => {
-            if (await this.checkMsgFromBot(ctx)) {
+        this.bot.on('message', async (ctx) => {
+            if (ctx.message.new_chat_member) {
+                await this.onNewChatMember(ctx, ctx.message.new_chat_member);
+                return;
+            }
+
+            if (await this.checkIsUnwatchedMsg(ctx)) {
                 return;
             }
 
@@ -76,7 +81,7 @@ export class BotService {
 
                 const targetOtp = moment().unix();
                 this.addressOtp[address] = targetOtp;
-                this.userAddress[tgUserId] = address;
+                this.userSessionData[tgUserId] = { address, nfts };
 
                 await ctx.reply(this.prepareMsgWithNft(nfts, targetOtp), {
                     reply_markup: {
@@ -105,20 +110,32 @@ export class BotService {
         });
     }
 
-    private static async checkMsgFromBot(ctx: any) {
-        const updateFrom = ctx.update?.callback_query?.from || ctx.message.from;
+    private static async checkIsUnwatchedMsg(ctx: any) {
+        const msg = ctx.message;
+
+        if (msg && msg.chat.id === config.CHAT_ID) return true;
+
+        const updateFrom = ctx.update?.callback_query?.from || msg?.from || {};
+
         if (updateFrom.is_bot) await errorHandler(ctx, "Fuck this bot :)")
+
         return updateFrom.is_bot;
     }
-
+ss
     private static bindOnCheckTxn() {
         this.bot.action(CHECK_TXN_ACTION, async (ctx) => {
-            if (await this.checkMsgFromBot(ctx)) {
+            if (await this.checkIsUnwatchedMsg(ctx)) {
                 return;
             }
 
             const tgUserId = ctx.update.callback_query.from.id;
-            console.log(`Finding owner txn from user with tgID:${tgUserId}`)
+            console.log(`Finding owner txn from user with tgID:${tgUserId}`);
+
+            const sessionData = this.userSessionData[tgUserId];
+            // already registered + clicked check txn btn
+            if (!sessionData) {
+                return;
+            }
 
             let txns: Txn[] = [];
 
@@ -136,18 +153,13 @@ export class BotService {
                 return this.addressOtp[address.toString()] === +otp;
             });
 
-            const address = this.userAddress[tgUserId];
-
-            if (!address) {
-                await ctx.reply("Cant find address");
-                return;
-            }
-
             // if (hasTxn) {
             if (true) {
 
                 try {
-                    await ChatMembersService.saveChatMember({ tgUserId, address, })
+                    console.log(`Start saving user ${tgUserId} with address ${sessionData.address}`);
+                    await ChatMembersService.saveChatMember({ tgUserId, address: sessionData.address, })
+                    console.log(`Done saving user ${tgUserId} with address ${sessionData.address}`);
                 } catch (e) {
                     await errorHandler(ctx, e.message)
                     return;
@@ -168,8 +180,18 @@ export class BotService {
                 return;
             }
 
+            console.log(`Cant find txn from user ${tgUserId} with address ${sessionData.address}`);
             await ctx.reply(chatMessagesConfig.sign.checkTxn.noTxn)
         });
+    }
+
+    private static async onNewChatMember(ctx: any, member: NewChatMember) {
+        const { nfts } = this.userSessionData[member.id]
+        const nftNames = this.getBeautifulNftsString(nfts);
+
+        ctx.reply(chatMessagesConfig.newMember
+            .replace("$USER$", member.username)
+            .replace("$NFTS$",nftNames));
     }
 
     private static prepareMsgWithNft(nfts: Nft[], otp: number): string {
@@ -179,7 +201,7 @@ export class BotService {
 
         if (nftNames.length === 1) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.one;
-        } else if (nftNames.length > 2 && nftNames.length < 5) {
+        } else if (nftNames.length >= 2 && nftNames.length < 5) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.less5;
         } else if (nftNames.length >= 5) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.more5;
@@ -210,6 +232,18 @@ export class BotService {
             })
             .map(it => `${colorByRarity[it.metadata.attributes[0].value]} ${it.metadata.name}\n`)
             .join("");
+    }
+
+    static async getChatMember(tgUserId: number) {
+        return this.bot.telegram.getChatMember(config.CHAT_ID, tgUserId);
+    }
+
+    static async kickChatMember(tgUserId: number) {
+        await this.bot.telegram.kickChatMember(config.CHAT_ID, tgUserId);
+    }
+
+    static async sendMessage(message: string) {
+        await this.bot.telegram.sendMessage(config.CHAT_ID, message);
     }
 
     private static async showUpdates() {
