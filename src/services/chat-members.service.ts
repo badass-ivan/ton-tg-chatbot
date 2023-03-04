@@ -11,6 +11,8 @@ export class ChatMembersService {
         members.map(it => {
             this.cachedMembers[it.address] = it;
         })
+
+        console.log(`Cache inited with members: ${members.length}`)
     }
 
     static getChatMembers(): ChatMember[] {

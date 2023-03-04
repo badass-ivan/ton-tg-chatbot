@@ -7,6 +7,7 @@ import base64 from "base-64";
 import { Address } from 'ton';
 import { ChatMembersService } from "./chat-members.service";
 import { ChatWatchdogService } from "./chat-watchdog.service";
+import chatMessagesConfig from "../chat-messages.config";
 
 const CHECK_TXN_ACTION = "check-txn-from-user-to-register"
 
@@ -23,11 +24,12 @@ export class BotService {
 
         this.bot = new Telegraf(config.BOT_TOKEN);
 
-        // await ChatMembersService.init();
-        // await ChatWatchdogService.start(this.bot);
-        // this.bindOnStart();
-        // this.bindOnText();
-        // this.bindOnCheckTxn();
+        await ChatMembersService.init();
+        await ChatWatchdogService.start(this.bot);
+
+        this.bindOnStart();
+        this.bindOnText();
+        this.bindOnCheckTxn();
 
         this.bot.launch()
     }
@@ -35,7 +37,7 @@ export class BotService {
 
     private static bindOnStart() {
         this.bot.start((ctx) => {
-            ctx.reply('Хэй, дружище!\nЕсли ты действительно хочешь в этот закрытый клуб, предъяви свои документики😎\n *отпарвь адрес своего кошелька*\n\nУ тебя должен быть хотя бы один наш NFT + не на продаже!');
+            ctx.reply(chatMessagesConfig.sign.start);
         });
     }
 
@@ -45,7 +47,7 @@ export class BotService {
             const tgUserId = ctx.message.from.id;
 
             if (ChatMembersService.chatMemberByUserId[tgUserId]) {
-                await ctx.reply("Да успокойся, ты уже в банде 😉");
+                await ctx.reply(chatMessagesConfig.sign.gettingAddress.alreadyInBand);
                 return;
             }
 
@@ -53,7 +55,7 @@ export class BotService {
                 const nfts = await TonService.getNftsFromTargetCollection(address);
 
                 if (!nfts.length) {
-                    await ctx.reply("Оу, дружище, мы не смогли найти у тебя наших NFT.")
+                    await ctx.reply(chatMessagesConfig.sign.gettingAddress.noNft)
                     return;
                 }
 
@@ -68,11 +70,11 @@ export class BotService {
                         inline_keyboard: [
                             [
                                 {
-                                    text: "Отправить",
-                                    url: this.createPayTonkeeperUrl(TonService.formatBalanceFromView(config.PAYMENT_FROM_VIRGIN), targetOtp)
+                                    text: chatMessagesConfig.sign.gettingAddress.btns.send,
+                                    url: this.createPayTonkeeperUrl(TonService.formatBalanceFromView(chatMessagesConfig.sign.price), targetOtp)
                                 },
                                 {
-                                    text: "Проверить",
+                                    text: chatMessagesConfig.sign.gettingAddress.btns.check,
                                     callback_data: CHECK_TXN_ACTION
                                 }
                             ],
@@ -80,7 +82,7 @@ export class BotService {
                     }
                 })
             } catch (e) {
-                await ctx.reply(`Ошибка системы: ${e.message}!\n\nПожалуйста, сообщите об этом администратору!`)
+                await ctx.reply(chatMessagesConfig.systemError.replace("$ERROR$", e.message))
             }
         });
     }
@@ -103,18 +105,45 @@ export class BotService {
                 await ChatMembersService.saveChatMember({ tgUserId, address, })
 
                 const chatLink = await this.bot.telegram.exportChatInviteLink(config.CHAT_ID);
-                ctx.reply(`Отлично, теперь ты часть нашей обезьяньей братвы!\n\nПрисодиняйся к <a href="${chatLink}">${config.TWA_CHAT_NAME}</a>`, {
-                    parse_mode: "HTML"
-                })
+                const link = `<a href="${chatLink}">${chatMessagesConfig.chatName}</a>`;
+
+                ctx.reply(chatMessagesConfig.sign.checkTxn.payed.replace("$CHAT_LINK$", link), { parse_mode: "HTML" })
                 return;
             }
 
-            ctx.reply("Хм... Кажется, твоя транзакция ещё не пришла.\nПопробуй повторить проверку чуть позже.")
+            ctx.reply(chatMessagesConfig.sign.checkTxn.noTxn)
         });
     }
 
     private static prepareMsgWithNft(nfts: Nft[], otp: number): string {
-        const nftNames = nfts
+
+        const nftNames = this.getBeautifulNftsString(nfts);
+
+        const endText = chatMessagesConfig.sign.gettingAddress.hasNft.endText
+            .replace("$PRICE", chatMessagesConfig.sign.price.toString())
+            .replace("$ADDRESS$", config.OWNER_ADDRESS)
+            .replace("$OTP$", otp.toString())
+
+        let text = "";
+
+        if (nftNames.length === 1) {
+            text = chatMessagesConfig.sign.gettingAddress.hasNft.one;
+        } else if (nftNames.length > 2 && nftNames.length < 5) {
+            text = chatMessagesConfig.sign.gettingAddress.hasNft.less5;
+        } else if (nftNames.length >= 5) {
+            text = chatMessagesConfig.sign.gettingAddress.hasNft.more5;
+        }
+
+        return text.replace("$NFTS$", nftNames)
+            .replace("$FINAL_TEXT$", endText)
+    }
+
+    private static createPayTonkeeperUrl(amount: number, text: number) {
+        return `https://app.tonkeeper.com/transfer/${config.OWNER_ADDRESS}?amount=${amount}&text=${text}`;
+    }
+
+    static getBeautifulNftsString(nfts: Nft[]) {
+        return nfts
             .sort((a, b) => {
                 const rarityPositionA = rarityPosition[a.metadata.attributes[0].value];
                 const rarityPositionB = rarityPosition[b.metadata.attributes[0].value];
@@ -126,22 +155,6 @@ export class BotService {
             })
             .map(it => `${colorByRarity[it.metadata.attributes[0].value]} ${it.metadata.name}\n`)
             .join("");
-
-        const endText = `Окей, теперь давай убедимся, что ты - это ты.\nОтправь 0.001 TON (это даже не рубль 😉) на этот адрес ${config.OWNER_ADDRESS} и комментарием: ${otp}`
-
-        if (nftNames.length === 1) {
-            return `Oу, да ты у нас новичёк!\n\n${nftNames}\nНу, ничего страшного!\n${endText}`
-        }
-
-        if (nftNames.length > 2 && nftNames.length < 5) {
-            return `Милости просим, собрат!\n\n${nftNames}\nНу, ничего страшного!\n${endText}`
-        }
-
-        return `Для таких господ, как вы, местечно всегда зарезервировано!\n\n${nftNames}\n${endText}`
-    }
-
-    private static createPayTonkeeperUrl(amount: number, text: number) {
-        return `https://app.tonkeeper.com/transfer/${config.OWNER_ADDRESS}?amount=${amount}&text=${text}`;
     }
 
     private static async showUpdates() {

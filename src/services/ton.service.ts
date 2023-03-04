@@ -7,7 +7,7 @@ export class TonService {
         try {
             const { data } = await axios.get(`${config.TON_API_URL}/nft/searchItems?`+ new URLSearchParams({
                 owner: address,
-                collection: config.TWA_COLLECTION_ADDRESS,
+                collection: config.COLLECTION_ADDRESS,
                 "include_on_sale": "false",
                 limit: "20",
                 offset: "0"

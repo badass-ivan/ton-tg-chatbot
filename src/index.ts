@@ -6,4 +6,9 @@ function main() {
     BotService.start();
 }
 
+const defaultLog = console.log;
+console.log = (...args) => {
+    defaultLog(...args, new Date())
+}
+
 main();

@@ -14,6 +14,7 @@ export class ChatWatchdogService {
     }
 
     private static async startCheckingChatUsers() {
+        console.log("Check bad chat members")
         await this.checkChatUsers();
 
         setInterval(() => {
@@ -28,7 +29,8 @@ export class ChatWatchdogService {
             const nfts = await TonService.getNftsFromTargetCollection(it.address);
 
             if (!nfts.length) {
-                const member = await this.bot.telegram.getChatMember(config.CHAT_ID, +it.tgUserId)
+                const member = await this.bot.telegram.getChatMember(config.CHAT_ID, +it.tgUserId);
+                console.log(`Remove ${member.user.username} from chat`)
                 await this.bot.telegram.kickChatMember(config.CHAT_ID, +it.tgUserId);
                 await this.bot.telegram.sendMessage(config.CHAT_ID, `${member.user.username} изгнан😈! Отсутствие обезьяны карается!`);
             }
