@@ -197,11 +197,11 @@ export class BotService {
                 return;
             }
 
-            const hasTxn = txns.reverse().find(txn => {
+            const hasTxn = txns.find(txn => {
                 if (!txn.in_msg.source) return false;
 
                 const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
-                const otp = decodedRawMsg.slice(decodedRawMsg.length - 9)
+                const otp = decodedRawMsg.slice(decodedRawMsg.length - 10)
                 const address = Address.parseRaw(txn.in_msg.source.address);
                 return this.addressOtp[address.toString()] == otp;
             });
