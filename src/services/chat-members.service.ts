@@ -19,7 +19,7 @@ export class ChatMembersService {
         return Object.values(this.cachedMembers)
     }
 
-    static get chatMemberByUserId(): { [tgUserId: string]: ChatMember | undefined } {
+    static getChatMembersByUserId(): { [tgUserId: string]: ChatMember | undefined } {
         return Object.fromEntries(
             this.getChatMembers().map(member => [member.tgUserId, member])
         );

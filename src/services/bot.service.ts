@@ -9,8 +9,10 @@ import { ChatMembersService } from "./chat-members.service";
 import { ChatWatchdogService } from "./chat-watchdog.service";
 import chatMessagesConfig from "../chat-messages.config";
 import { errorHandler } from "../utils/error-handler";
+import { add } from "lodash";
 
-const CHECK_TXN_ACTION = "check-txn-from-user-to-register"
+const CHECK_TXN_ACTION = "check-txn-from-user-to-register";
+const CHECK_NFTS_ACTION = "check-user-nfts-to-register";
 
 export class BotService {
 
@@ -29,7 +31,8 @@ export class BotService {
         await ChatWatchdogService.start();
 
         this.bindOnStart();
-        this.bindOnText();
+        this.bindOnMessage();
+        this.bindOnRecheckNfts();
         this.bindOnCheckTxn();
 
         this.bot.launch()
@@ -46,7 +49,7 @@ export class BotService {
         });
     }
 
-    private static bindOnText() {
+    private static bindOnMessage() {
         this.bot.on('message', async (ctx) => {
             const msg = ctx.message;
 
@@ -64,52 +67,78 @@ export class BotService {
 
             console.log(`Getting message: ${address} from ${tgUserId}`);
 
-            if (ChatMembersService.chatMemberByUserId[tgUserId]) {
+            if (ChatMembersService.getChatMembersByUserId()[tgUserId]) {
                 console.log(`${tgUserId} already in chat`);
                 await ctx.reply(chatMessagesConfig.sign.gettingAddress.alreadyInBand);
                 return;
             }
 
-            try {
-                const nfts = await TonService.getNftsFromTargetCollection(address);
+            if (ChatMembersService.getChatMembers().some(it => it.address === address)) {
+                console.log(`Address: ${address} requested from user with tgId: ${tgUserId} already in use`);
+                await ctx.reply(chatMessagesConfig.sign.gettingAddress.addressAlreadyInUse);
+                return;
+            }
 
-                if (!nfts.length) {
-                    console.log(`${tgUserId} has no NFTs`);
-                    await ctx.reply(chatMessagesConfig.sign.gettingAddress.noNft)
-                    return;
-                }
+            await this.checkNfts(ctx, address, tgUserId);
+        });
+    }
 
-                console.log(`Send check msg to ${tgUserId}`);
+    private static async checkNfts(ctx: any, address: string, tgUserId: number) {
+        try {
+            const nfts = await TonService.getNftsFromTargetCollection(address);
 
-                const targetOtp = moment().unix();
-                this.addressOtp[address] = targetOtp;
-                this.userSessionData[tgUserId] = { address, nfts };
+            this.userSessionData[tgUserId] = { address, nfts };
 
-                await ctx.reply(this.prepareMsgWithNft(nfts, targetOtp), {
+            if (!nfts.length) {
+                console.log(`User with tgId: ${tgUserId} and address: ${address} has no NFTs`);
+                await ctx.reply(chatMessagesConfig.sign.gettingAddress.noNft, {
                     reply_markup: {
                         inline_keyboard: [
                             [
                                 {
-                                    text: chatMessagesConfig.sign.gettingAddress.btns.send,
-                                    url: this.createPayTonkeeperUrl(TonService.formatBalanceFromView(chatMessagesConfig.sign.price), targetOtp)
+                                    text: chatMessagesConfig.sign.gettingAddress.btns.toCollection,
+                                    url: config.COLLECTION_URL,
                                 },
                                 {
-                                    text: chatMessagesConfig.sign.gettingAddress.btns.check,
-                                    callback_data: CHECK_TXN_ACTION
+                                    text: chatMessagesConfig.sign.gettingAddress.btns.checkNfts,
+                                    callback_data: CHECK_NFTS_ACTION
                                 }
                             ],
                         ]
                     }
                 })
-            } catch (e) {
-                console.error(e)
-                if (e.message.includes("illegal base64 data at input byte ")) {
-                    await ctx.reply(chatMessagesConfig.sign.gettingAddress.isNotAddress);
-                    return;
-                }
-                await errorHandler(ctx, e.message)
+                return;
             }
-        });
+
+            console.log(`Send check msg to ${tgUserId}`);
+
+            const targetOtp = moment().unix();
+            this.addressOtp[address] = targetOtp;
+
+            await ctx.reply(this.prepareMsgWithNft(nfts, targetOtp), {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: chatMessagesConfig.sign.gettingAddress.btns.send,
+                                url: this.createPayTonkeeperUrl(TonService.formatBalanceFromView(chatMessagesConfig.sign.price), targetOtp)
+                            },
+                            {
+                                text: chatMessagesConfig.sign.gettingAddress.btns.checkTxn,
+                                callback_data: CHECK_TXN_ACTION
+                            }
+                        ],
+                    ]
+                }
+            })
+        } catch (e) {
+            console.error(e)
+            if (e.message.includes("illegal base64 data at input byte ")) {
+                await ctx.reply(chatMessagesConfig.sign.gettingAddress.isNotAddress);
+                return;
+            }
+            await errorHandler(ctx, e.message)
+        }
     }
 
     private static async checkIsUnwatchedMsg(ctx: any) {
@@ -117,13 +146,28 @@ export class BotService {
 
         if (msg && msg.chat.id === config.CHAT_ID) return true;
 
-        const updateFrom = ctx.update?.callback_query?.from || msg?.from || {};
-
-        if (updateFrom.is_bot) await errorHandler(ctx, "Fuck this bot :)")
-
-        return updateFrom.is_bot;
+        const fromUser = ctx.update?.callback_query?.from || msg?.from || {};
+        return fromUser.is_bot;
     }
-ss
+
+    private static bindOnRecheckNfts() {
+        this.bot.action(CHECK_NFTS_ACTION, async (ctx) => {
+            if (await this.checkIsUnwatchedMsg(ctx)) {
+                return;
+            }
+
+            const tgUserId = ctx.update.callback_query.from.id;
+            const sessionData = this.userSessionData[tgUserId];
+
+            if (!sessionData) {
+                ctx.reply(chatMessagesConfig.sign.gettingAddress.sessionExpired);
+                return;
+            }
+
+            await this.checkNfts(ctx, sessionData.address, tgUserId);
+        })
+    }
+
     private static bindOnCheckTxn() {
         this.bot.action(CHECK_TXN_ACTION, async (ctx) => {
             if (await this.checkIsUnwatchedMsg(ctx)) {
@@ -131,11 +175,11 @@ ss
             }
 
             const tgUserId = ctx.update.callback_query.from.id;
-            console.log(`Finding owner txn from user with tgID:${tgUserId}`);
-
             const sessionData = this.userSessionData[tgUserId];
-            // already registered + clicked check txn btn
-            if (!sessionData) {
+            console.log(`Finding owner txn from user with tgID: ${tgUserId}, address: ${sessionData?.address} and otp: ${this.addressOtp[sessionData?.address]}`);
+
+            // already registered
+            if (ChatMembersService.getChatMembersByUserId()[tgUserId]) {
                 return;
             }
 
@@ -180,13 +224,27 @@ ss
                 return;
             }
 
-            console.log(`Cant find txn from user ${tgUserId} with address ${sessionData.address}`);
+            console.log(`Cant find txn from user with tgId: ${tgUserId} and address: ${sessionData.address}`);
             await ctx.reply(chatMessagesConfig.sign.checkTxn.noTxn)
         });
     }
 
     private static async onNewChatMember(ctx: any, member: NewChatMember) {
-        const { nfts } = this.userSessionData[member.id]
+        const sessionData = this.userSessionData[member.id];
+
+        let address = sessionData.address;
+
+        console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
+
+        if (!sessionData) {
+            const chatUser = ChatMembersService.getChatMembersByUserId()[member.id];
+            if (!chatUser) return;
+
+            address = chatUser.address;
+        }
+
+        const nfts = sessionData?.nfts || await TonService.getNftsFromTargetCollection(address);
+
         const nftNames = this.getBeautifulNftsString(nfts);
 
         ctx.reply(chatMessagesConfig.newMember
@@ -195,22 +253,22 @@ ss
     }
 
     private static prepareMsgWithNft(nfts: Nft[], otp: number): string {
-        const nftNames = this.getBeautifulNftsString(nfts);
-
         let text = "";
 
-        if (nftNames.length === 1) {
+        if (nfts.length === 1) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.one;
-        } else if (nftNames.length >= 2 && nftNames.length < 5) {
+        } else if (nfts.length >= 2 && nfts.length < 5) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.less5;
-        } else if (nftNames.length >= 5) {
+        } else if (nfts.length >= 5) {
             text = chatMessagesConfig.sign.gettingAddress.hasNft.more5;
         }
 
         const endText = chatMessagesConfig.sign.gettingAddress.hasNft.endText
             .replace("$PRICE", chatMessagesConfig.sign.price.toString())
             .replace("$ADDRESS$", config.OWNER_ADDRESS)
-            .replace("$OTP$", otp.toString())
+            .replace("$OTP$", otp.toString());
+
+        const nftNames = this.getBeautifulNftsString(nfts);
 
         return text.replace("$NFTS$", nftNames).replace("$FINAL_TEXT$", endText)
     }

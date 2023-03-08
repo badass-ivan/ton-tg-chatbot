@@ -46,13 +46,15 @@ export enum Rarity {
     Uncommon = "Uncommon",
     Rare = "Rare",
     Epic = "Epic",
+    Legendary = "Legendary",
 }
 
 export const rarityPosition = {
-    "Common": 3,
-    "Uncommon": 2,
-    "Rare": 1,
-    "Epic": 0,
+    "Common": 4,
+    "Uncommon": 3,
+    "Rare": 2,
+    "Epic": 1,
+    "Legendary": 0,
 }
 
 export const colorByRarity = {
@@ -60,6 +62,7 @@ export const colorByRarity = {
     "Uncommon": "🔵",
     "Rare": "🟣",
     "Epic": "🔴",
+    "Legendary": "🟡",
 }
 
 export type RawChatMember = {
