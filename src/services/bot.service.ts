@@ -178,6 +178,11 @@ export class BotService {
             const sessionData = this.userSessionData[tgUserId];
             console.log(`Finding owner txn from user with tgID: ${tgUserId}, address: ${sessionData?.address} and otp: ${this.addressOtp[sessionData?.address]}`);
 
+            if (!sessionData) {
+                console.log("Expired session")
+                return;
+            }
+
             // already registered
             if (ChatMembersService.getChatMembersByUserId()[tgUserId]) {
                 return;
