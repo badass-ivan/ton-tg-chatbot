@@ -35,6 +35,8 @@ export class BotService {
         this.bindOnRecheckNfts();
         this.bindOnCheckTxn();
 
+        await this.showUpdates();
+
         this.bot.launch()
         console.log("Bot started!");
     }
@@ -58,11 +60,12 @@ export class BotService {
                 return;
             }
 
-            if (await this.checkIsUnwatchedMsg(ctx)) {
+            const address = ctx.message.text;
+
+            if (await this.checkIsUnwatchedMsg(ctx) || !address) {
                 return;
             }
 
-            const address = ctx.message.text;
             const tgUserId = ctx.message.from.id;
 
             console.log(`Getting message: ${address} from ${tgUserId}`);
