@@ -35,8 +35,6 @@ export class BotService {
         this.bindOnRecheckNfts();
         this.bindOnCheckTxn();
 
-        await this.showUpdates();
-
         this.bot.launch()
         console.log("Bot started!");
     }
