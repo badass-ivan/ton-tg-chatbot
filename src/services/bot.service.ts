@@ -203,7 +203,7 @@ export class BotService {
                 const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
                 const otp = decodedRawMsg.slice(decodedRawMsg.length - 9)
                 const address = Address.parseRaw(txn.in_msg.source.address);
-                return this.addressOtp[address.toString()] === +otp;
+                return this.addressOtp[address.toString()] == otp;
             });
 
             if (hasTxn) {
