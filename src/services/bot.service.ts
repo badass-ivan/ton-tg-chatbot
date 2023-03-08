@@ -193,6 +193,8 @@ export class BotService {
             }
 
             const hasTxn = txns.reverse().find(txn => {
+                if (!txn.in_msg.source) return false;
+
                 const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
                 const otp = decodedRawMsg.slice(decodedRawMsg.length - 9)
                 const address = Address.parseRaw(txn.in_msg.source.address);
