@@ -26,13 +26,19 @@ export class ChatWatchdogService {
             const it = members[i];
             console.log(`Watchdog check ${it.tgUserId} with ${it.address}`)
 
-            const nfts = await TonService.getNftsFromTargetCollection(it.address);
+            try {
+                const nfts = await TonService.getNftsFromTargetCollection(it.address);
 
-            if (!nfts.length) {
-                const member = await BotService.getChatMember(+it.tgUserId);
-                console.log(`Remove ${member.user.username} from chat`)
-                await BotService.kickChatMember(+it.tgUserId);
-                await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", member.user.username));
+                if (!nfts.length) {
+                    const tgMember = await BotService.getChatMember(+it.tgUserId);
+                    console.log(`Remove ${tgMember.user.username} from chat`)
+                    await BotService.kickChatMember(+it.tgUserId);
+                    await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", tgMember.user.username));
+                    await ChatMembersService.removeChatMember(it);
+                }
+
+            } catch (e) {
+                console.error(e);
             }
 
             await new Promise(res => setTimeout(res, 200))

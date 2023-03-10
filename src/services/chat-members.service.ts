@@ -29,4 +29,9 @@ export class ChatMembersService {
         this.cachedMembers[chatMember.address] = await ChatMembers.saveChatMember(chatMember);
         return this.cachedMembers[chatMember.address]
     }
+
+    static async removeChatMember(member: ChatMember): Promise<void> {
+        delete this.cachedMembers[member.address];
+        await ChatMembers.removeChatMemberById(member.id);
+    }
 }
