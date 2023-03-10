@@ -240,9 +240,7 @@ export class BotService {
     private static async onNewChatMember(ctx: any, member: NewChatMember) {
         const sessionData = this.userSessionData[member.id];
 
-        let address = sessionData.address;
-
-        console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
+        let address = sessionData?.address;
 
         if (!sessionData) {
             const chatUser = ChatMembersService.getChatMembersByUserId()[member.id];
@@ -250,6 +248,8 @@ export class BotService {
 
             address = chatUser.address;
         }
+
+        console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
 
         const nfts = sessionData?.nfts || await TonService.getNftsFromTargetCollection(address);
 

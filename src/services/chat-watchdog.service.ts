@@ -1,5 +1,3 @@
-import { Telegraf } from "telegraf-ts";
-import config from "../config";
 import { TonService } from "./ton.service";
 import { ChatMembersService } from "./chat-members.service";
 import chatMessagesConfig from "../chat-messages.config";
@@ -9,10 +7,10 @@ export class ChatWatchdogService {
 
     static start() {
         this.startCheckingChatUsers();
+        console.log("Watchdog inited")
     }
 
     private static async startCheckingChatUsers() {
-        console.log("Check bad chat members")
         await this.checkChatUsers();
 
         setInterval(() => {
@@ -21,9 +19,13 @@ export class ChatWatchdogService {
     }
 
     private static async checkChatUsers() {
+        console.log("Start watchdog finding...")
         const members = ChatMembersService.getChatMembers();
 
-        await Promise.all(members.map(async it => {
+        for(let i = 0; i < members.length; i++) {
+            const it = members[i];
+            console.log(`Watchdog check ${it.tgUserId} with ${it.address}`)
+
             const nfts = await TonService.getNftsFromTargetCollection(it.address);
 
             if (!nfts.length) {
@@ -32,6 +34,8 @@ export class ChatWatchdogService {
                 await BotService.kickChatMember(+it.tgUserId);
                 await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", member.user.username));
             }
-        }))
+
+            await new Promise(res => setTimeout(res, 200))
+        }
     }
 }
