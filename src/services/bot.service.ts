@@ -199,12 +199,13 @@ export class BotService {
             }
 
             const hasTxn = txns.find(txn => {
-                if (!txn.in_msg.source) return false;
+                if (!txn.in_msg.source || !txn.in_msg.msg_data) return false;
 
-                const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
-                const otp = decodedRawMsg.slice(decodedRawMsg.length - 10)
                 const address = Address.parseRaw(txn.in_msg.source.address);
-                return this.addressOtp[address.toString()] == otp;
+                const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
+                const cachedOtp = this.addressOtp[address.toString()];
+                const otp = decodedRawMsg.slice(decodedRawMsg.length - cachedOtp.toString().length)
+                return cachedOtp == otp;
             });
 
             if (hasTxn) {
