@@ -26,12 +26,16 @@ export class ChatMembersService {
     }
 
     static async saveChatMember(chatMember: RawChatMember): Promise<ChatMember | undefined> {
+        console.log(`Start saving user ${chatMember.tgUserId} with address ${chatMember.address}`);
         this.cachedMembers[chatMember.address] = await ChatMembers.saveChatMember(chatMember);
+        console.log(`Done saving user ${chatMember.tgUserId} with address ${chatMember.address}`);
         return this.cachedMembers[chatMember.address]
     }
 
     static async removeChatMember(member: ChatMember): Promise<void> {
+        console.log(`Start removing user ${member.tgUserId} with address ${member.address}`);
         delete this.cachedMembers[member.address];
         await ChatMembers.removeChatMemberById(member.id);
+        console.log(`Done removing user ${member.tgUserId} with address ${member.address}`);
     }
 }

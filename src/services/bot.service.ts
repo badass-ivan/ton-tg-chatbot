@@ -31,9 +31,6 @@ export class BotService {
             this.bindOnRecheckNfts();
             this.bindOnCheckTxn();
 
-            // try to fix bod self kill
-            this.startShowingUpdates();
-
             this.bot.launch()
 
             console.log("Bot started!");
@@ -218,15 +215,11 @@ export class BotService {
 
             if (hasTxn) {
                 try {
-                    console.log(`Start saving user ${tgUserId} with address ${sessionData.address}`);
                     await ChatMembersService.saveChatMember({ tgUserId, address: sessionData.address, })
-                    console.log(`Done saving user ${tgUserId} with address ${sessionData.address}`);
+                    await this.sendInviteLink(ctx);
                 } catch (e: any) {
                     await this.errorHandler(ctx, e.message)
-                    return;
                 }
-
-                await this.sendInviteLink(ctx);
                 return;
             }
 
@@ -266,7 +259,7 @@ export class BotService {
         console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
 
         if (!address) {
-            console.error(`Cant get address for new member with tgId: ${member.id} and address: ${address}!`);
+            console.error(`Cant get address FOR NEW MEMBER with tgId: ${member.id}`);
             return;
         }
 
@@ -335,14 +328,11 @@ export class BotService {
         try {
             console.log("Getting bot updates...")
             const updates = await this.bot.telegram.getUpdates();
-            console.log(`Fount ${updates.length} updates`)
+            console.log(`Found ${updates.length} updates`)
             console.log(`Updates: ${JSON.stringify(updates)}`)
         } catch (e: any) {
             console.error(e.message);
         }
-
-        await new Promise(res => setTimeout(res, 1000 * 60 * 5));
-        this.startShowingUpdates()
     }
 
     static async errorHandler(ctx: any, error: string) {

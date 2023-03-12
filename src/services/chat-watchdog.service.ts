@@ -19,12 +19,11 @@ export class ChatWatchdogService {
     }
 
     private static async checkChatUsers() {
-        console.log("Start watchdog finding...")
         const members = ChatMembersService.getChatMembers();
+        console.log(`Start watchdog finding for ${members.length} members...`)
 
         for(let i = 0; i < members.length; i++) {
             const it = members[i];
-            console.log(`Watchdog check ${it.tgUserId} with ${it.address}`)
 
             try {
                 const nfts = await TonService.getNftsFromTargetCollection(it.address);
