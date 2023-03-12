@@ -1,6 +1,6 @@
 import { ChatMember, RawChatMember } from "../models/types";
 import { Column, Model, PrimaryKey, Table } from "sequelize-typescript";
-import { uuid } from "uuidv4";
+import { v4 as uuid } from "uuid";
 
 @Table({
     tableName: "chat_members",
