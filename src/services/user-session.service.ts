@@ -19,17 +19,9 @@ export class UserSessionService {
         console.log(`Cache inited with sessions: ${sessions.length}`)
     }
 
-    static getSessions(): Session[] {
-        return Object.values(this.userSessionData).filter(it => it) as Session[]
-    }
-
     static async getSessionByUserId(tgUserId: number): Promise<Session | undefined> {
-        const sessionsByUserId = Object.fromEntries(
-            this.getSessions().map(it => [it.tgUserId, it])
-        );
-
-        if (sessionsByUserId[tgUserId]) {
-            return sessionsByUserId[tgUserId];
+        if (this.userSessionData[tgUserId]) {
+            return this.userSessionData[tgUserId];
         }
 
         const session = await UserSession.findByTgUserId(tgUserId);

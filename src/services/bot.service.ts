@@ -71,7 +71,7 @@ export class BotService {
 
             if (ChatMembersService.getChatMembersByUserId()[tgUserId]) {
                 console.log(`${tgUserId} already in chat`);
-                await ctx.reply(chatMessagesConfig.sign.gettingAddress.alreadyInBand);
+                await this.sendInviteLink(ctx, chatMessagesConfig.sign.gettingAddress.alreadyInBand);
                 return;
             }
 
@@ -186,11 +186,11 @@ export class BotService {
 
             // already registered
             if (ChatMembersService.getChatMembersByUserId()[tgUserId]) {
+                await this.sendInviteLink(ctx, chatMessagesConfig.sign.gettingAddress.alreadyInBand);
                 return;
             }
 
             let txns: Txn[] = [];
-
             try {
                txns = await TonService.getTxns(config.OWNER_ADDRESS);
             } catch (e: any) {
@@ -222,24 +222,29 @@ export class BotService {
                     return;
                 }
 
-                await ctx.reply(chatMessagesConfig.sign.checkTxn.payed, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                {
-                                    text: chatMessagesConfig.chatName,
-                                    url: await this.bot.telegram.exportChatInviteLink(config.CHAT_ID)
-                                }
-                            ],
-                        ]
-                    }
-                })
+                await this.sendInviteLink(ctx);
                 return;
             }
 
             console.log(`Cant find txn from user with tgId: ${tgUserId} and address: ${sessionData.address}`);
+
             await ctx.reply(chatMessagesConfig.sign.checkTxn.noTxn)
         });
+    }
+
+    private static async sendInviteLink(ctx: any, text?: string): Promise<void>{
+        await ctx.reply(text || chatMessagesConfig.sign.checkTxn.payed, {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {
+                            text: chatMessagesConfig.chatName,
+                            url: await this.bot.telegram.exportChatInviteLink(config.CHAT_ID)
+                        }
+                    ],
+                ]
+            }
+        })
     }
 
     private static async onNewChatMember(ctx: any, member: NewChatMember) {
