@@ -1,4 +1,4 @@
-import { Telegraf } from "telegraf-ts";
+import { ExtraEditMessage, Telegraf } from "telegraf-ts";
 import config from "../config";
 import { TonService } from "./ton.service";
 import { colorByRarity, NewChatMember, Nft, rarityPosition, Txn } from "../models/types";
@@ -18,26 +18,30 @@ export class BotService {
     private static bot: Telegraf<any>;
 
     static async start() {
-        console.log("Start bot preparing");
-
         this.bot = new Telegraf(config.BOT_TOKEN);
 
-        await ChatMembersService.init();
-        await UserSessionService.init();
+        try {
+            console.log("Start bot preparing");
 
-        this.bindOnStart();
-        this.bindOnMessage();
-        this.bindOnRecheckNfts();
-        this.bindOnCheckTxn();
+            await ChatMembersService.init();
+            await UserSessionService.init();
 
-        // try to fix bod self kill
-        this.startShowingUpdates();
+            this.bindOnStart();
+            this.bindOnMessage();
+            this.bindOnRecheckNfts();
+            this.bindOnCheckTxn();
 
-        this.bot.launch()
+            // try to fix bod self kill
+            this.startShowingUpdates();
 
-        console.log("Bot started!");
+            this.bot.launch()
 
-        ChatWatchdogService.start();
+            console.log("Bot started!");
+
+            ChatWatchdogService.start();
+        } catch (e: any) {
+            console.error(e.message)
+        }
     }
 
 
@@ -262,7 +266,7 @@ export class BotService {
         console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
 
         if (!address) {
-            await this.sendErrorToAdmin("Cant get address for new member!")
+            console.error(`Cant get address for new member with tgId: ${member.id} and address: ${address}!`);
             return;
         }
 
@@ -334,7 +338,7 @@ export class BotService {
             console.log(`Fount ${updates.length} updates`)
             console.log(`Updates: ${JSON.stringify(updates)}`)
         } catch (e: any) {
-            await this.sendErrorToAdmin(e.message);
+            console.error(e.message);
         }
 
         await new Promise(res => setTimeout(res, 1000 * 60 * 5));
@@ -342,12 +346,21 @@ export class BotService {
     }
 
     static async errorHandler(ctx: any, error: string) {
-        await this.sendErrorToAdmin(error);
+        console.error(error);
         await ctx.reply(chatMessagesConfig.systemError.replace("$ERROR$", error))
     }
 
     static async sendErrorToAdmin(error: string) {
-        console.error(error)
-        await this.bot.telegram.sendMessage(config.ADMIN_CHAT_ID, `⚠️\n${error}\n⚠️`);
+        await this.sendMsgToAdmin(`#error\n⚠️\n${error}\n⚠️`, {
+            disable_notification: false,
+        });
+    }
+
+    static async sendMsgToAdmin(msg: string, extra?: ExtraEditMessage ) {
+        if (!this.bot) return;
+
+        await this.bot.telegram.sendMessage(config.ADMIN_CHAT_ID, msg, extra || {
+            disable_notification: true,
+        });
     }
 }
