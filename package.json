@@ -4,8 +4,8 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "start": "set NODE_ENV=development && del-cli --force dist && tsc && node dist/src/index.js",
-    "build": "set NODE_ENV=production && tsc --build",
+    "start": "del-cli --force dist && tsc && node dist/src/index.js",
+    "build": "tsc --build",
     "clean": "tsc --build --clean"
   },
   "dependencies": {
