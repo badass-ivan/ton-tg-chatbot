@@ -6,8 +6,8 @@ import { BotService } from "./bot.service";
 export class ChatWatchdogService {
 
     static start() {
-        this.startCheckingChatUsers();
         console.log("Watchdog inited")
+        this.startCheckingChatUsers();
     }
 
     private static async startCheckingChatUsers() {
@@ -33,7 +33,7 @@ export class ChatWatchdogService {
                     const tgMember = await BotService.getChatMember(+it.tgUserId);
                     console.log(`Remove ${tgMember.user.username} from chat`)
                     await BotService.kickChatMember(+it.tgUserId);
-                    await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", tgMember.user.username));
+                    await BotService.sendMessage(chatMessagesConfig.watchdog.ban.replace("$USER$", tgMember.user.username || ""));
                     await ChatMembersService.removeChatMember(it);
                 }
 

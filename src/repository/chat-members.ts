@@ -12,13 +12,13 @@ export class ChatMembers extends Model {
 
     @PrimaryKey
     @Column
-    id: string;
+    id!: string;
 
     @Column({ field: "address" })
-    address: string;
+    address!: string;
 
     @Column({ field: "tg_user_id" })
-    tgUserId: string;
+    tgUserId!: string;
 
     static async getAllChatMembers(): Promise<ChatMember[]> {
         return this.findAll()

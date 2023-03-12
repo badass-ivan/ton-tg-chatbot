@@ -16,7 +16,7 @@ export class ChatMembersService {
     }
 
     static getChatMembers(): ChatMember[] {
-        return Object.values(this.cachedMembers)
+        return Object.values(this.cachedMembers).filter(it => it) as ChatMember[]
     }
 
     static getChatMembersByUserId(): { [tgUserId: string]: ChatMember | undefined } {
@@ -25,7 +25,7 @@ export class ChatMembersService {
         );
     }
 
-    static async saveChatMember(chatMember: RawChatMember): Promise<ChatMember> {
+    static async saveChatMember(chatMember: RawChatMember): Promise<ChatMember | undefined> {
         this.cachedMembers[chatMember.address] = await ChatMembers.saveChatMember(chatMember);
         return this.cachedMembers[chatMember.address]
     }

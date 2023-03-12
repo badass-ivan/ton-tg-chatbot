@@ -11,7 +11,7 @@ export type Nft = {
         name: string,
         description: string,
         marketplace: string,
-        attributes:[{ "trait_type": string, "value": string }],
+        attributes:[{ "trait_type": string, "value": Rarity }],
         image: string
     },
     owner: {
@@ -76,3 +76,10 @@ export type RawChatMember = {
 export type ChatMember = RawChatMember & {
     id: string,
 }
+
+export type Session = {
+    tgUserId: number,
+    address: string,
+    nfts?: Nft[],
+    otp: number
+};

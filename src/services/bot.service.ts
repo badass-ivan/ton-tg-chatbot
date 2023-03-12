@@ -8,8 +8,7 @@ import { Address } from 'ton';
 import { ChatMembersService } from "./chat-members.service";
 import { ChatWatchdogService } from "./chat-watchdog.service";
 import chatMessagesConfig from "../chat-messages.config";
-import { errorHandler } from "../utils/error-handler";
-import { add } from "lodash";
+import { UserSessionService } from "./user-session.service";
 
 const CHECK_TXN_ACTION = "check-txn-from-user-to-register";
 const CHECK_NFTS_ACTION = "check-user-nfts-to-register";
@@ -18,25 +17,27 @@ export class BotService {
 
     private static bot: Telegraf<any>;
 
-    private static addressOtp: { [address: string]: number } = {};
-
-    private static userSessionData: { [tgUserId: string]: { address: string, nfts: Nft[] } | null } = {};
-
     static async start() {
         console.log("Start bot preparing");
 
         this.bot = new Telegraf(config.BOT_TOKEN);
 
         await ChatMembersService.init();
-        await ChatWatchdogService.start();
+        await UserSessionService.init();
 
         this.bindOnStart();
         this.bindOnMessage();
         this.bindOnRecheckNfts();
         this.bindOnCheckTxn();
 
+        // try to fix bod self kill
+        this.startShowingUpdates();
+
         this.bot.launch()
+
         console.log("Bot started!");
+
+        ChatWatchdogService.start();
     }
 
 
@@ -88,7 +89,9 @@ export class BotService {
         try {
             const nfts = await TonService.getNftsFromTargetCollection(address);
 
-            this.userSessionData[tgUserId] = { address, nfts };
+            const targetOtp = moment().unix();
+
+            await UserSessionService.saveSession({ tgUserId, address, nfts, otp: targetOtp })
 
             if (!nfts.length) {
                 console.log(`User with tgId: ${tgUserId} and address: ${address} has no NFTs`);
@@ -111,10 +114,7 @@ export class BotService {
                 return;
             }
 
-            console.log(`Send check msg to ${tgUserId}`);
-
-            const targetOtp = moment().unix();
-            this.addressOtp[address] = targetOtp;
+            console.log(`Send msg to ${tgUserId} with create/check txn actions`);
 
             await ctx.reply(this.prepareMsgWithNft(nfts, targetOtp), {
                 reply_markup: {
@@ -132,13 +132,13 @@ export class BotService {
                     ]
                 }
             })
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
             if (e.message.includes("illegal base64 data at input byte ")) {
                 await ctx.reply(chatMessagesConfig.sign.gettingAddress.isNotAddress);
                 return;
             }
-            await errorHandler(ctx, e.message)
+            await this.errorHandler(ctx, e.message)
         }
     }
 
@@ -158,10 +158,10 @@ export class BotService {
             }
 
             const tgUserId = ctx.update.callback_query.from.id;
-            const sessionData = this.userSessionData[tgUserId];
+            const sessionData = await UserSessionService.getSessionByUserId(tgUserId);
 
             if (!sessionData) {
-                ctx.reply(chatMessagesConfig.sign.gettingAddress.sessionExpired);
+                await this.errorHandler(ctx, "Session failed when user select action to recheck nfts!")
                 return;
             }
 
@@ -176,11 +176,11 @@ export class BotService {
             }
 
             const tgUserId = ctx.update.callback_query.from.id;
-            const sessionData = this.userSessionData[tgUserId];
-            console.log(`Finding owner txn from user with tgID: ${tgUserId}, address: ${sessionData?.address} and otp: ${this.addressOtp[sessionData?.address]}`);
+            const sessionData = await UserSessionService.getSessionByUserId(tgUserId);
+            console.log(`Finding owner txn from user with tgID: ${tgUserId}, address: ${sessionData?.address} and otp: ${sessionData?.otp}`);
 
             if (!sessionData) {
-                console.log("Expired session")
+                await this.errorHandler(ctx, "Session failed when user select action to recheck txn!")
                 return;
             }
 
@@ -193,8 +193,8 @@ export class BotService {
 
             try {
                txns = await TonService.getTxns(config.OWNER_ADDRESS);
-            } catch (e) {
-                await errorHandler(ctx, e.message)
+            } catch (e: any) {
+                await this.errorHandler(ctx, e.message)
                 return;
             }
 
@@ -202,10 +202,14 @@ export class BotService {
                 if (!txn.in_msg.source || !txn.in_msg.msg_data) return false;
 
                 const address = Address.parseRaw(txn.in_msg.source.address);
+
                 const decodedRawMsg = base64.decode(txn.in_msg.msg_data);
-                const cachedOtp = this.addressOtp[address.toString()];
+
+                const cachedOtp = sessionData.otp.toString();
+
                 const otp = decodedRawMsg.slice(decodedRawMsg.length - cachedOtp.toString().length)
-                return cachedOtp == otp;
+
+                return address.toString() == sessionData.address && cachedOtp == otp;
             });
 
             if (hasTxn) {
@@ -213,8 +217,8 @@ export class BotService {
                     console.log(`Start saving user ${tgUserId} with address ${sessionData.address}`);
                     await ChatMembersService.saveChatMember({ tgUserId, address: sessionData.address, })
                     console.log(`Done saving user ${tgUserId} with address ${sessionData.address}`);
-                } catch (e) {
-                    await errorHandler(ctx, e.message)
+                } catch (e: any) {
+                    await this.errorHandler(ctx, e.message)
                     return;
                 }
 
@@ -239,7 +243,7 @@ export class BotService {
     }
 
     private static async onNewChatMember(ctx: any, member: NewChatMember) {
-        const sessionData = this.userSessionData[member.id];
+        const sessionData = await UserSessionService.getSessionByUserId(member.id);
 
         let address = sessionData?.address;
 
@@ -251,6 +255,10 @@ export class BotService {
         }
 
         console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
+
+        if (!address) {
+            return;
+        }
 
         const nfts = sessionData?.nfts || await TonService.getNftsFromTargetCollection(address);
 
@@ -282,7 +290,7 @@ export class BotService {
         return text.replace("$NFTS$", nftNames).replace("$FINAL_TEXT$", endText)
     }
 
-    private static createPayTonkeeperUrl(amount: number, text: number) {
+    static createPayTonkeeperUrl(amount: number, text: number) {
         return `https://app.tonkeeper.com/transfer/${config.OWNER_ADDRESS}?amount=${amount}&text=${text}`;
     }
 
@@ -313,9 +321,22 @@ export class BotService {
         await this.bot.telegram.sendMessage(config.CHAT_ID, message);
     }
 
-    private static async showUpdates() {
+    private static async startShowingUpdates() {
+        console.log("Getting bot updates...")
         const updates = await this.bot.telegram.getUpdates();
-        console.log(updates)
+        console.log(`Fount ${updates.length} updates`)
         console.log(JSON.stringify(updates))
+
+        await new Promise(res => setTimeout(res, 1000 * 60 * 5));
+        this.startShowingUpdates()
+    }
+
+    static async errorHandler(ctx: any, error: string) {
+        await this.sendErrorToAdmin(error);
+        await ctx.reply(chatMessagesConfig.systemError.replace("$ERROR$", error))
+    }
+
+    static async sendErrorToAdmin(error: string) {
+        await this.bot.telegram.sendMessage(config.ADMIN_CHAT_ID, error);
     }
 }
