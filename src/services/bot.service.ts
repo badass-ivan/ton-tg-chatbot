@@ -257,6 +257,7 @@ export class BotService {
         console.log(`New chat member with tgId: ${member.id} and address: ${address}`);
 
         if (!address) {
+            await this.sendErrorToAdmin("Cant get address for new member!")
             return;
         }
 
@@ -322,10 +323,14 @@ export class BotService {
     }
 
     private static async startShowingUpdates() {
-        console.log("Getting bot updates...")
-        const updates = await this.bot.telegram.getUpdates();
-        console.log(`Fount ${updates.length} updates`)
-        console.log(JSON.stringify(updates))
+        try {
+            console.log("Getting bot updates...")
+            const updates = await this.bot.telegram.getUpdates();
+            console.log(`Fount ${updates.length} updates`)
+            console.log(`Updates: ${JSON.stringify(updates)}`)
+        } catch (e: any) {
+            await this.sendErrorToAdmin(e.message);
+        }
 
         await new Promise(res => setTimeout(res, 1000 * 60 * 5));
         this.startShowingUpdates()
@@ -337,6 +342,7 @@ export class BotService {
     }
 
     static async sendErrorToAdmin(error: string) {
-        await this.bot.telegram.sendMessage(config.ADMIN_CHAT_ID, error);
+        console.error(error)
+        await this.bot.telegram.sendMessage(config.ADMIN_CHAT_ID, `⚠️\n${error}\n⚠️`);
     }
 }

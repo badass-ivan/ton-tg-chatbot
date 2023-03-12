@@ -13,16 +13,16 @@ export class UserSession extends Model {
 
     @PrimaryKey
     @Column
-    id!: string;
+    id: string;
 
     @Column({ field: "tg_user_id" })
-    tgUserId!: string;
+    tgUserId: string;
 
     @Column({ field: "address" })
-    address!: string;
+    address: string;
 
     @Column({ field: "otp" })
-    otp!: string;
+    otp: string;
 
     static async getSessions(): Promise<UserSession[]> {
         return this.findAll();
@@ -30,7 +30,7 @@ export class UserSession extends Model {
 
     static async findByTgUserId(tgUserId: number): Promise<UserSession | null> {
         return this.findOne({
-            where: { tgUserId }
+            where: { tgUserId: tgUserId.toString() }
         })
     }
 

@@ -1,21 +1,29 @@
 {
     "compilerOptions": {
-        "experimentalDecorators": true,
         "module": "commonjs",
         "target": "es6",
+        "emitDecoratorMetadata": true,
+        "esModuleInterop": true,
+        "noImplicitAny": false,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "sourceMap": true,
+        "allowJs": true,
+
+        "experimentalDecorators": true,
+        "allowSyntheticDefaultImports": true,
         "declaration": true,
         "composite": true,
         "outDir": "dist",
         "rootDir": ".",
-        "strict": true,
         "baseUrl": ".",
+        //"strict": true,
         "lib": [
             "es2020"
         ],
         "rootDirs": [
             "./src"
-        ],
-        "allowSyntheticDefaultImports": true
+        ]
     },
     "include": [
         "src"
