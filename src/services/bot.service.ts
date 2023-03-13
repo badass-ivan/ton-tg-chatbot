@@ -118,6 +118,7 @@ export class BotService {
             console.log(`Send msg to ${tgUserId} with create/check txn actions`);
 
             await ctx.reply(this.prepareMsgWithNft(nfts, targetOtp), {
+                parse_mode:"HTML",
                 reply_markup: {
                     inline_keyboard: [
                         [
@@ -284,13 +285,17 @@ export class BotService {
         }
 
         const endText = chatMessagesConfig.sign.gettingAddress.hasNft.endText
-            .replace("$PRICE", chatMessagesConfig.sign.price.toString())
-            .replace("$ADDRESS$", config.OWNER_ADDRESS)
-            .replace("$OTP$", otp.toString());
+            .replace("$PRICE$", this.getHtmlCodeElem(chatMessagesConfig.sign.price.toString()))
+            .replace("$ADDRESS$", this.getHtmlCodeElem(config.OWNER_ADDRESS))
+            .replace("$OTP$", this.getHtmlCodeElem(otp.toString()));
 
         const nftNames = this.getBeautifulNftsString(nfts);
 
         return text.replace("$NFTS$", nftNames).replace("$FINAL_TEXT$", endText)
+    }
+
+    private static getHtmlCodeElem(text: string) {
+        return `<code>${text}</code>`;
     }
 
     static createPayTonkeeperUrl(amount: number, text: number) {
