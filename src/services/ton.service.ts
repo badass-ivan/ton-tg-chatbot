@@ -16,8 +16,9 @@ export class TonService {
 
             return data.nft_items;
         } catch (e: any) {
-            const errorData = e.response?.data;
-            throw Error(errorData.error || errorData.message || JSON.stringify(errorData) || e.message)
+            console.log("ERROR WITH: ", address);
+            const errorData = e.response?.data || {};
+            throw Error(errorData.error || errorData.message || e.message)
         }
     }
 
@@ -29,8 +30,9 @@ export class TonService {
 
             return data.transactions;
         } catch (e: any) {
-            const errorData = e.response?.data;
-            throw Error(errorData.error || errorData.message || JSON.stringify(errorData) || e.message)
+            console.log("ERROR WITH: ", address);
+            const errorData = e.response?.data || {};
+            throw Error(errorData.error || errorData.message || e.message)
         }
     }
 
